@@ -7,6 +7,13 @@
           <mappings>
             <mapping deploy="/" local="$PROJECT_DIR$" web="/" />
           </mappings>
+          <excludedPaths>
+            <excludedPath path="/beta" />
+            <excludedPath path="/beta.integralawgroup.com" />
+            <excludedPath path="/modules" />
+            <excludedPath path="/sites/all" />
+            <excludedPath path="/sites/beta.integralawgroup.com/modules" />
+          </excludedPaths>
         </serverdata>
       </paths>
     </serverData>
