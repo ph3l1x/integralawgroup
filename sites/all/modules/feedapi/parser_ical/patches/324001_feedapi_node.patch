@@ -1,0 +1,23 @@
+--- feedapi_node/feedapi_node.module	10 Oct 2008 12:54:35 -0000	1.1.2.18.2.17
++++ feedapi_node/feedapi_node.module	21 Oct 2008 03:11:17 -0000
+@@ -81,12 +81,14 @@
+ function feedapi_node_link($type, $node = NULL) {
+   $links = array();
+   if ($type == 'node') {
+-    if (count($node->feed->processors) > 0 && module_exists('views')) {
+-      if (in_array('feedapi_node', $node->feed->processors)) {
+-        $links['view_items'] = array(
+-          'title' => t('Feed items'),
+-          'href' => 'feed-item/'. $node->nid
+-        );
++    if (isset($node->feed)) {
++      if (count($node->feed->processors) > 0 && module_exists('views')) {
++        if (in_array('feedapi_node', $node->feed->processors)) {
++          $links['view_items'] = array(
++            'title' => t('Feed items'),
++            'href' => 'feed-item/'. $node->nid
++          );
++        }
+       }
+     }
+     if (isset($node->feedapi_node)) {

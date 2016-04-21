@@ -1,0 +1,21 @@
+body {
+	background-color:#000000;
+	margin:0px;
+	padding:0px;
+}
+/*
+#contain {
+	position:absolute;
+	top:50%;
+	left:50%;
+	width:744px;
+	height:394px;
+	margin: -372px 0 0 -197px; 
+}
+*/
+
+.enter {
+	background:url(images/integra_script.jpg);
+	width:526px;
+	height:353px;
+}

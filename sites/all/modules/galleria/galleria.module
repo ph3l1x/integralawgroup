@@ -1,0 +1,290 @@
+<?php
+// $Id: galleria.module,v 1.1.2.13 2009/03/23 14:40:16 marktheunissen Exp $
+
+/**
+ * @file
+ * Turns a node into a Galleria image gallery.
+ */
+
+/**
+ * Include necessary files for the galleria.
+ */
+function galleria_includes() {
+  static $included = FALSE;
+  if (!$included) {
+    $modulepath = drupal_get_path('module', 'galleria');
+    drupal_add_css($modulepath . '/inc/galleria.css');
+    drupal_add_js($modulepath . '/inc/jquery.galleria.js');
+    drupal_add_js($modulepath . '/inc/galleria.js');
+
+    $settings = array(
+      'thumb_opacity' => variable_get('galleria_thumb_opacity', 0.3),
+    );
+    drupal_add_js($settings, 'setting');
+    $included = TRUE;
+  }
+}
+
+/**
+ * Helper to ensure file extension is an image
+ */
+function galleria_validate_file_extensions($files) {
+  $allowed_extensions = array('jpg', 'png', 'jpeg', 'gif');
+  $valid = TRUE;
+
+  // check each file extension
+  foreach ($files as $file) {
+    $ext = strtolower(substr($file->filename, -4));
+    if (substr($ext, 0, 1) == '.') {
+      $ext = substr($ext, 1, 3);
+    }
+    if (!in_array($ext, $allowed_extensions)) {
+      $valid = FALSE;
+    }
+  }
+
+  return $valid;
+}
+
+/**
+ * Helper function to only display messages if the admin option is checked.
+ */
+function galleria_set_message($message, $severity) {
+  if (variable_get('galleria_show_page_warning', 1)) {
+    drupal_set_message($message, $severity);
+  }
+}
+
+/**
+ * Check that the node is a valid Galleria
+ */
+function galleria_is_valid($node) {
+  $valid = FALSE;
+
+  if (is_object($node)) {
+    // are there attachments?
+    if (!empty($node->files)) {
+      if (!($valid = galleria_validate_file_extensions($node->files))) {
+        galleria_set_message(t('Invalid Galleria: one or more attached files are not images.'), 'error');
+      }
+    }
+    else {
+      galleria_set_message(t('Invalid Galleria: there are no attachments.'), 'error');
+    }
+  }
+  else {
+    galleria_set_message(t('Invalid Galleria: not a node.'), 'error');
+  }
+
+  return $valid;
+}
+
+/**
+ * Implementation of hook_form_alter().
+ */
+function galleria_form_alter(&$form, $form_state, $form_id) {
+  if ($form_id == 'node_type_form' && isset($form['identity']['type'])) {
+    $form['workflow']['galleria'] = array(
+      '#type' => 'radios',
+      '#title' => t('Galleria'),
+      '#default_value' => variable_get('galleria_'. $form['#node_type']->type, 0),
+      '#options' => array(t('Disabled'), t('Enabled')),
+      '#description' => t('Convert this node type into a Galleria.')
+    );
+  }
+}
+
+/**
+ * Implementation of hook_theme().
+ */
+function galleria_theme() {
+  return array(
+    'galleria' => array(
+      'template' => 'galleria',
+      'arguments' => array('node' => NULL),
+    ),
+    'galleria_lightbox_link' => array(
+      'arguments' => array('nid' => NULL),
+    ),
+  );
+}
+
+/**
+ * Implementation of hook_perm().
+ */
+function galleria_perm() {
+  return array('administer galleria');
+}
+
+/**
+ * Implementation of hook_menu().
+ */
+function galleria_menu() {
+  $items['galleria_html'] = array(
+    'page callback' => 'galleria_html',
+    'access callback' => 'user_access',
+    'access arguments' => array('access content'),
+    'type' => MENU_CALLBACK,
+  );
+  $items['admin/settings/galleria'] = array(
+    'title' => 'Galleria settings',
+    'description' => 'Change the Galleria settings',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('galleria_admin_settings'),
+    'access arguments' => array('administer galleria'),
+    'type' => MENU_NORMAL_ITEM,
+    'file' => 'galleria.admin.inc',
+  );
+  return $items;
+}
+
+/**
+ * Menu callback to create just the HTML data that gets embedded in
+ * a lightbox.
+ *
+ * @param $nid
+ *    node id to serve XML from
+ */
+function galleria_html($nid = NULL) {
+  if (is_numeric($nid)) {
+    $node = node_load($nid);
+    // is this a galleria type?
+    if (variable_get("galleria_$node->type", 0) == 1) {
+      if (galleria_is_valid($node)) {
+
+        // build the galleria
+        galleria_includes();
+        $output = theme('galleria', $node);
+
+        // just blat it, short circuiting Drupal page load.
+        print $output;
+      }
+      else {
+        // don't bother setting error messages as this is done in the validation check
+        return drupal_not_found();
+      }
+    }
+    else {
+      drupal_set_message(t('Node type is not selected as a Galleria.'), 'error');
+    }
+  }
+}
+
+/**
+* Implementation of hook_content_extra_fields() in content.module.
+*
+* CCK hook to allow sorting of the gallery display.
+*/
+function galleria_content_extra_fields($type_name) {
+  if (!empty($type_name) && variable_get("galleria_$type_name", 0) == 1) {
+    return array(
+      'galleria' => array(
+        'label' => t('Gallery'),
+        'description' => t('The Galleria display.'),
+        'weight' => -10,
+      ),
+    );
+  }
+}
+
+/**
+ * Implementation of hook_nodeapi().
+ */
+function galleria_nodeapi(&$node, $op, $teaser = NULL, $page = NULL) {
+  switch ($op) {
+    case 'view':
+      if (variable_get("galleria_$node->type", 0) == 1) {
+        if ($page) {
+          if (galleria_is_valid($node)) {
+            // this is a galleria node, so perform modifications!
+            galleria_includes();
+            unset($node->content['files']);
+            $node->content['galleria']['#value'] = theme('galleria', $node);
+            $node->content['galleria']['#weight'] = module_exists('content') ? content_extra_field_weight($node->type, "galleria") : -10;
+          }
+        }
+        else {
+          galleria_set_message(t('Gallerias only display when viewing a node by itself on the page.'), 'warning');
+        }
+      }
+  }
+}
+
+/**
+ * Theme the link that opens a lightbox with a galleria in it
+ */
+function theme_galleria_lightbox_link($nid, $width, $height, $text) {
+  if (!is_numeric($nid) || !is_numeric($width) || !is_numeric($height)) {
+    galleria_set_message(t('Invalid arguments passed to theme_galleria_lightbox_link.'), 'error');
+    return;
+  }
+
+  if (!module_exists('lightbox2')) {
+    galleria_set_message(t('Please install the Lightbox2 module to enable this functionality'), 'error');
+    return;
+  }
+
+  galleria_includes();
+  $attribs = array(
+    'rel' => 'lightmodal[|width:' . $width . 'px; height:' . $height . 'px;]',
+  );
+  return l($text, "galleria_html/$nid", array('attributes' => $attribs, 'html' => TRUE));
+}
+
+/**
+ * Preprocess the galleria variables.
+ */
+function template_preprocess_galleria(&$vars) {
+  $node = $vars['node'];
+  $files = $node->files;
+  $images = array();
+  $i = 0;
+
+  $imagecache_exists = module_exists('imagecache');
+  $img_preset = variable_get('galleria_imagecache_preset', '');
+  $thumb_preset = variable_get('galleria_thumb_imagecache_preset', '');
+
+  foreach ($files as $file) {
+    $caption = $file->description != $file->filename ? $file->description : '';
+    $url = $file->filepath;
+
+    if ($imagecache_exists && $thumb_preset) {
+      $thumb = theme('imagecache', $thumb_preset, $file->filepath, $caption, $caption);
+    }
+
+    if ($imagecache_exists && $img_preset) {
+      if ($thumb) {
+        // Preset for both thumbnail and gallery image
+        $image = l($thumb, imagecache_create_url($img_preset, $file->filepath), array('html' => TRUE, 'attributes' => array('title' => $caption)));
+      }
+      else {
+        // Preset for only the gallery image
+        $image = theme('imagecache', $img_preset, $file->filepath, $caption, $caption);
+      }
+    }
+    else {
+      if ($thumb) {
+        // Preset for only the thumbnail image
+        $image = l($thumb, $file->filepath, array('html' => TRUE, 'attributes' => array('title' => $caption)));
+      }
+      else {
+        // No presets selected
+        $image = theme('image', $file->filepath, $caption, $caption);
+      }
+    }
+
+    $images[] = array(
+      'data' => $image,
+      'class' => $i == 0 ? 'active' : '',
+    );
+
+    $i++;
+  }
+
+  $attribs = array(
+    'class' => 'gallery clear-block',
+  );
+
+  $vars['next_prev_links'] = '<a onclick="$.galleria.prev(); return false;" href="#"><< ' . t('previous') . '</a> | <a onclick="$.galleria.next(); return false;" href="#">' . t('next') . '>></a>';
+  $vars['gallery'] = theme('item_list', $images, NULL, 'ul', $attribs);
+}

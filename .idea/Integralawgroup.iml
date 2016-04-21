@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<module type="WEB_MODULE" version="4">
+  <component name="NewModuleRootManager">
+    <content url="file://$MODULE_DIR$">
+      <excludeFolder url="file://$MODULE_DIR$/beta" />
+      <excludeFolder url="file://$MODULE_DIR$/beta.integralawgroup.com" />
+      <excludeFolder url="file://$MODULE_DIR$/boise-bankruptcy-attorney" />
+      <excludeFolder url="file://$MODULE_DIR$/cgi-bin" />
+      <excludeFolder url="file://$MODULE_DIR$/integralawblog" />
+      <excludeFolder url="file://$MODULE_DIR$/misc" />
+      <excludeFolder url="file://$MODULE_DIR$/modules" />
+      <excludeFolder url="file://$MODULE_DIR$/sites-old" />
+      <excludeFolder url="file://$MODULE_DIR$/sites/all/modules" />
+      <excludeFolder url="file://$MODULE_DIR$/sites/beta.integralawgroup.com/archive" />
+      <excludeFolder url="file://$MODULE_DIR$/sites/beta.integralawgroup.com/files" />
+      <excludeFolder url="file://$MODULE_DIR$/sites/beta.integralawgroup.com/images" />
+      <excludeFolder url="file://$MODULE_DIR$/sites/beta.integralawgroup.com/modules" />
+      <excludeFolder url="file://$MODULE_DIR$/sites/default/files" />
+      <excludeFolder url="file://$MODULE_DIR$/www" />
+    </content>
+    <orderEntry type="inheritedJdk" />
+    <orderEntry type="sourceFolder" forTests="false" />
+  </component>
+</module>

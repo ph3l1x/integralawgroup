@@ -1,0 +1,13 @@
+--- parser_common_ical.module	2008-03-08 11:33:12.000000000 -0500
++++ parser_common_ical.module	2008-05-30 15:48:17.781361600 -0400
+@@ -120,7 +119,9 @@ function _parser_common_ical_parse($feed
+ //    $item->options->teaser = $teaser;
+     $item->options->location = $event['URL'];
+     $item->options->original_author = $original_author;
+-    $item->options->timestamp = date_format(date_ical_date($event['CREATED']),'U'); // TODO tz?
++    if($event['CREATED']){
++      $item->options->timestamp = date_format(date_ical_date($event['CREATED']),'U'); // TODO tz?
++    }
+     $item->options->original_url = $original_url;
+     $item->options->guid = $event['UID']; // intention
+     $item->options->tags = array();// check

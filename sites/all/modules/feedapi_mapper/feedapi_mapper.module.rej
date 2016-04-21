@@ -1,0 +1,177 @@
+***************
+*** 46,56 ****
+   */
+  function feedapi_mapper_nodeapi(&$node, $op, $teaser, $page) {
+    switch ($op) {
+-   case 'prepare':
+-     if ($node->feedapi->feed_item) {
+-       _feedapi_mapper_map($node);
+-     }
+-     break;
+    }
+  }
+  
+--- 46,56 ----
+   */
+  function feedapi_mapper_nodeapi(&$node, $op, $teaser, $page) {
+    switch ($op) {
++     case 'prepare':
++       if (isset($node->feedapi) && $node->feedapi->feed_item) {
++         _feedapi_mapper_map($node);
++       }
++       break;
+    }
+  }
+  
+***************
+*** 75,81 ****
+          $element_path = unserialize($element_path);
+          // Get the feed item element on $element_path and pass it into the mapping function.
+          $feed_item_element = _feedapi_mapper_get_feed_item_element($element_path, $feed_item);
+-         $node = call_user_func($field[0] .'_feedapi_mapper', 'map', $node, $field[1], $feed_item_element, $field[2]);
+        }
+      }
+    }
+--- 75,81 ----
+          $element_path = unserialize($element_path);
+          // Get the feed item element on $element_path and pass it into the mapping function.
+          $feed_item_element = _feedapi_mapper_get_feed_item_element($element_path, $feed_item);
++         $node = call_user_func($field[0] .'_feedapi_mapper', 'map', $node, $field[1], $feed_item_element, isset($field[2]) ? $field[2] : NULL);
+        }
+      }
+    }
+***************
+*** 89,95 ****
+    if (count($path) > 0) {
+      return _feedapi_mapper_get_feed_item_element($path, $item[$p]);
+    }
+-   else {
+      return $item[$p];
+    }
+  }
+--- 89,95 ----
+    if (count($path) > 0) {
+      return _feedapi_mapper_get_feed_item_element($path, $item[$p]);
+    }
++   else if (isset($item[$p])) {
+      return $item[$p];
+    }
+  }
+***************
+*** 109,115 ****
+    }
+    $names = node_get_types('names');
+    drupal_set_title($node->title ? $node->title : $names[$node->type]);
+-   $output .= t('Map feed item elements to feed item node fields.');
+    $output .= drupal_get_form('feedapi_mapper_form', $node);
+    return $output;
+  }
+--- 109,115 ----
+    }
+    $names = node_get_types('names');
+    drupal_set_title($node->title ? $node->title : $names[$node->type]);
++   $output = t('Map feed item elements to feed item node fields.');
+    $output .= drupal_get_form('feedapi_mapper_form', $node);
+    return $output;
+  }
+***************
+*** 189,195 ****
+        '#type' => 'select',
+        '#title' => $element_name,
+        '#options' => $field_mappers,
+-       '#default_value' => $mapping[$path],
+      );
+    }
+    $form['submit'] = array(
+--- 189,195 ----
+        '#type' => 'select',
+        '#title' => $element_name,
+        '#options' => $field_mappers,
++       '#default_value' => isset($mapping[$path]) ? $mapping[$path] : '',
+      );
+    }
+    $form['submit'] = array(
+***************
+*** 313,318 ****
+      // Convert items to array.
+      $items = _feedapi_mapper_obj2array($feed->items);
+      // Merge items to one item.
+      if (is_array($items)) {
+        $i = 0;
+        foreach ($items as $item) {
+--- 313,319 ----
+      // Convert items to array.
+      $items = _feedapi_mapper_obj2array($feed->items);
+      // Merge items to one item.
++     $merged = NULL;
+      if (is_array($items)) {
+        $i = 0;
+        foreach ($items as $item) {
+***************
+*** 440,446 ****
+  function _feedapi_mapper_array_merge_recursive($array1, $array2) {
+    foreach ($array1 as $k => $v) {
+      if (is_array($array1[$k])) {
+-       $result[$k] = _feedapi_mapper_array_merge_recursive($array1[$k], $array2[$k]);
+      }
+      else {
+        $result[$k] = $array1[$k];
+--- 441,447 ----
+  function _feedapi_mapper_array_merge_recursive($array1, $array2) {
+    foreach ($array1 as $k => $v) {
+      if (is_array($array1[$k])) {
++       $result[$k] = _feedapi_mapper_array_merge_recursive($array1[$k], isset($array2[$k]) ? $array2[$k] : NULL);
+      }
+      else {
+        $result[$k] = $array1[$k];
+***************
+*** 449,455 ****
+    if (is_array($array2)) {
+      foreach ($array2 as $k => $v) {
+        if (is_array($array2[$k])) {
+-         $result[$k] = _feedapi_mapper_array_merge_recursive($array2[$k], $array1[$k]);
+        }
+        else {
+          $result[$k] = $array2[$k];
+--- 450,456 ----
+    if (is_array($array2)) {
+      foreach ($array2 as $k => $v) {
+        if (is_array($array2[$k])) {
++         $result[$k] = _feedapi_mapper_array_merge_recursive($array2[$k], isset($array1[$k]) ? $array1[$k] : NULL);
+        }
+        else {
+          $result[$k] = $array2[$k];
+***************
+*** 525,530 ****
+    $form_id = $node_type .'_node_form';
+    $node = new stdClass();
+    $node->type = $node_type;
+    // Borrow this from CCK:
+    // Some modules (userreview...) "hide" their node forms, resulting in no field
+    // being listed. We set a special flag to inform them this form is special.
+--- 526,533 ----
+    $form_id = $node_type .'_node_form';
+    $node = new stdClass();
+    $node->type = $node_type;
++   $node->name = NULL; // prevent PHP notice from node_form()
++ 
+    // Borrow this from CCK:
+    // Some modules (userreview...) "hide" their node forms, resulting in no field
+    // being listed. We set a special flag to inform them this form is special.
+***************
+*** 577,583 ****
+   *   HTML output.
+   */
+  function theme_feedapi_mapper_descriptions($descriptions) {
+-   $output .= '<dl>';
+    foreach ($descriptions as $field_mapper => $implementations) {
+      foreach ($implementations as $module => $description) {
+        $output .= '<dt><strong>'. $field_mapper .' '. t('(!module_name module)', array('!module_name' => $module)) .'</strong></dt>';
+--- 580,586 ----
+   *   HTML output.
+   */
+  function theme_feedapi_mapper_descriptions($descriptions) {
++   $output = '<dl>';
+    foreach ($descriptions as $field_mapper => $implementations) {
+      foreach ($implementations as $module => $description) {
+        $output .= '<dt><strong>'. $field_mapper .' '. t('(!module_name module)', array('!module_name' => $module)) .'</strong></dt>';

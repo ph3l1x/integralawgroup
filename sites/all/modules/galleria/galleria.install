@@ -1,0 +1,16 @@
+<?php
+// $Id: galleria.install,v 1.1.2.4 2009/03/23 14:31:14 marktheunissen Exp $
+
+/**
+ * Implementation of hook_uninstall().
+ */
+function galleria_uninstall() {
+  variable_del('galleria_thumb_opacity');
+  variable_del('galleria_show_page_warning');
+  variable_del('galleria_imagecache_preset');
+  variable_del('galleria_thumb_imagecache_preset');
+  $node_types = node_get_types('names');
+  foreach ($node_types as $type) {
+    variable_del("galleria_$type");
+  }
+}

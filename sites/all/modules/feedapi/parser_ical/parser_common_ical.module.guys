@@ -1,0 +1,330 @@
+<?php
+/* $Id$ */
+
+/**
+ * @file
+ * Parse the incoming URL with date_api_ical 
+ */
+
+/**
+ * Implementation of hook_help().
+ */
+function parser_common_ical_help($path,$arg) {
+  switch($path) {
+    case 'admin/modules#description':
+      return t('Provide a common ical parser for FeedAPI-compatible modules.');
+    case 'feedapi/full_name':
+      return t('Parser Common iCal Syndication');
+  }
+}
+
+/**
+ * Implementation of hook_feedapi_feed().
+ */
+function parser_common_ical_feedapi_feed($op) {
+  $args = func_get_args();
+  switch ($op) {
+    case 'type':
+      return array('iCal feed');
+    case 'compatible':
+      $url = is_object($args[1]) ? $args[1] : FALSE;
+      $ical_array = _parser_common_ical_feedapi_parse($url, FALSE);
+      if ($ical_array !== FALSE) {
+        return 'iCal feed';
+      }
+      else {
+        return FALSE;
+      }
+    case 'parse':
+      $feed = is_object($args[1]) ? $args[1] : FALSE;
+      $cache = isset($args[2]) ? $args[2] : FALSE;
+      return _parser_common_ical_feedapi_parse($feed, $cache);
+  }
+}
+
+/**
+ * Implementaton of hook_requirements().
+ */
+function parser_common_ical_requirements() {
+  $requirements = array();
+  // Ensure translations don't break at install time
+  $t = get_t();
+  switch ($phase) {
+    case 'install' :
+    case 'runtime' :
+      // module exists date module
+      // if not $requirements['ical'] = array(
+      /*   'title' => $t("FeedAPI iCal Parser"),
+           'description' => $t("Install the !dateapi module.", array('!dateapi' => l('DateAPI', 'http://drupal.org/projects/date', array(), NULL, NULL, TRUE))),
+           'severity' => $phase == 'install' ? REQUIREMENT_WARNING : REQUIREMENT_ERROR,
+           'value' => $t('dateapi.module file missing'),
+         );
+      // else
+        $requirements['ical'] = array(
+          'title' => $t('FeedAPI iCal Parser'),
+          'description' => t('iCal Parser using the DateAPI module'),
+          'severity' => REQUIREMENT_OK,
+          'value' => $t('Installed correctly'),
+        );
+      */
+    }
+  return $requirements;
+}
+
+/**
+ * Parse the feed into a data structure
+ *
+ * @param $url
+ *  The feed's url
+ * @param $cache
+ *  If the results can be cached or not
+ * @return stdClass
+ *  The structured datas extracted from the feed
+ */
+function _parser_common_ical_feedapi_parse($feed, $cache = FALSE) {
+  $downloaded_string = _parser_common_ical_download($feed->url);
+  if ($downloaded_string === FALSE || $downloaded_string === FEEDAPI_FEED_NOT_UPDATED) {
+    return $downloaded_string;
+  }
+  
+  return _parser_common_ical_parse($downloaded_string);
+}
+
+/**
+ * Parse iCal feeds.
+ *
+ * Uses patched ical_upload.
+ */
+function _parser_common_ical_parse($feed_content) {
+  include_once(drupal_get_path('module', 'date_api') .'/date_api_ical.inc');
+  $feed_folded = explode("\n", $feed_content);
+  $ical_parsed = _parser_common_ical_patched_date_ical_parse($feed_folded);
+  $ical = $ical_parsed[0];
+
+  $parsed_source = new stdClass();
+  // Detect the title
+  $parsed_source->title = $ical['X-WR-CALNAME']; 
+  // Detect the description
+  $parsed_source->description = $ical['X-WR-CALDESC'];
+  $parsed_source->options = new stdClass();
+  $parsed_source->options->calscale = $ical['CALSCALE'];
+  $parsed_source->options->timezone = $ical['X-WR-TIMEZONE'];
+  $parsed_source->items = array();
+
+  // for now write to temp file and send to ical, request change in ical_import api
+  foreach ($ical['VEVENT'] as $event)	{
+    $item = new stdClass();
+    $item->title = $event['SUMMARY'];
+    $item->description = $event['DESCRIPTION'];
+    $item->options = new stdClass();
+//    $item->options->teaser = $teaser;
+    $item->options->location = $event['URL'];
+    $item->options->original_author = $original_author;
+    if($event['CREATED']){
+      $item->options->timestamp = date_format(date_ical_date($event['CREATED']),'U'); // TODO tz?
+    }
+    $item->options->original_url = $original_url;
+    $item->options->guid = $event['UID']; // intention
+    $item->options->tags = array();// check
+    $item->raw = $event;
+    $parsed_source->items[] = $item;
+  }
+  return $parsed_source;
+}
+
+/******************************************************************************************************************
+ * PATCHED FUNCTIONS
+ */
+/********************************************
+ * _parser_common_syndication_download
+ *
+ * Just changed to allow passing of $allowed_mine array()
+ */
+function _parser_common_ical_download($url) {
+  $method = 'GET';
+  $follow = 3;
+  $data = NULL;
+  $headers = array();
+  if (!empty($username)) {
+    $headers['Authorization'] = 'Basic '. base64_encode("$username:$password");
+  }
+  $result = drupal_http_request($url, $headers, $method, $data, $follow);
+  return $result->data;
+}
+
+/********************************
+ * date_ical_upload() with the file opening removed
+ *
+ * the alternative is to get the file, save it to a temp file and then run on the temp file
+ * or not use all the feed tracking stuff that parser_common_syndication has
+ */
+function _parser_common_ical_patched_date_ical_parse($icaldatafolded) {
+  // Verify this is iCal data
+  if (trim($icaldatafolded[0]) != 'BEGIN:VCALENDAR') {
+    drupal_set_message('Invalid calendar file:'. $filename, 'error');
+    return false;
+  }
+
+  // "unfold" wrapped lines
+  $icaldata = array();
+  foreach ($icaldatafolded as $line) {
+    $out = array();
+    // See if this looks like the beginning of a new property or value.
+    // If not, it is a continuation of the previous line.
+    // The regex is to ensure that wrapped QUOTED-PRINTABLE data
+    // is kept intact.
+    if (!preg_match('/([A-Z]+)[:;](.*)/', $line, $out)) {
+      $line = array_pop($icaldata) . ($line);
+    }
+    $icaldata[] = $line;
+  }
+  unset($icaldatafolded);
+
+  // Parse the iCal information
+  $parents = array();
+  $subgroups = array();
+  foreach ($icaldata as $line) {
+    $line = trim($line);
+    $vcal .= $line ."\n";
+    // Deal with begin/end tags separately
+    if (preg_match('/(BEGIN|END):V(\S+)/', $line, $matches)) {
+      $closure = $matches[1];
+      $type = 'V'. $matches[2];
+      if ($closure == 'BEGIN') {
+        array_push($parents, $type);
+        array_push($subgroups, array());
+      }
+      else if ($closure == 'END') {
+        end($subgroups);
+        $subgroup =& $subgroups[key($subgroups)];
+        switch ($type) {
+          case 'VCALENDAR':
+            if (prev($subgroups) == false) {
+              $items[] = array_pop($subgroups);
+            }
+            else {
+              $parent[array_pop($parents)][] = array_pop($subgroups);
+            }
+            break;
+          // Add the timezones in with their index their TZID
+          case 'VTIMEZONE':
+            $subgroup = end($subgroups);
+            $id = $subgroup['TZID'];
+            unset($subgroup['TZID']);
+
+            // Append this subgroup onto the one above it
+            prev($subgroups);
+            $parent =& $subgroups[key($subgroups)];
+
+            $parent[$type][$id] = $subgroup;
+
+            array_pop($subgroups);
+            array_pop($parents);
+            break;
+          // Do some fun stuff with durations and all_day events
+          // and then append to parent
+          case 'VEVENT':
+          case 'VALARM':
+          case 'VTODO':
+          case 'VJOURNAL':
+          case 'VVENUE':
+          case 'VFREEBUSY':
+          default:
+            // Can't be sure whether DTSTART is before or after DURATION,
+            // so parse DURATION at the end.
+            if (isset($subgroup['DURATION'])) {
+              date_ical_parse_duration($subgroup);
+            }
+            // Check for all-day events setting the 'all_day' property under
+            // the component instead of DTSTART/DTEND subcomponents
+            if ((isset($subgroup['DTSTART']) && !isset($subgroup['DTEND'])) ||
+            ($subgroup['DTSTART']['all_day'] && $subgroup['DTEND']['all_day'])) {
+              $subgroup['all_day'] = true;
+              if (!isset($subgroup['DTEND'])) {
+                $subgroup['DTEND'] = $subgroup['DTSTART'];
+              }
+              unset($subgroup['DTSTART']['all_day']);
+              unset($subgroup['DTEND']['all_day']);
+            }
+          // Add this element to the parent as an array under the
+          // component name
+          default:
+            prev($subgroups);
+            $parent =& $subgroups[key($subgroups)];
+
+            $parent[$type][] = $subgroup;
+
+            array_pop($subgroups);
+            array_pop($parents);
+            break;
+        }
+      }
+    }
+    // Handle all other possibilities
+    else {
+      // Grab current subgroup
+      end($subgroups);
+      $subgroup =& $subgroups[key($subgroups)];
+
+      // Split up the line into nice pieces for PROPERTYNAME,
+      // PROPERTYATTRIBUTES, and PROPERTYVALUE
+      preg_match('/([^;:]+)(?:;([^:]*))?:(.+)/', $line, $matches);
+      $name = strtoupper(trim($matches[1]));
+      $field = $matches[2];
+      $data = $matches[3];
+
+      $parse_result = '';
+      switch ($name) {
+        // Keep blank lines out of the results.
+        case '':
+          break;
+
+          // Lots of properties have date values that must be parsed out.
+        case 'CREATED':
+        case 'LAST-MODIFIED':
+        case 'DTSTART':
+        case 'DTEND':
+        case 'DTSTAMP':
+        case 'RDATE':
+        case 'TRIGGER':
+        case 'FREEBUSY':
+        case 'DUE':
+        case 'COMPLETED':
+          $parse_result = date_ical_parse_date($field, $data);
+          break;
+
+        case 'EXDATE':
+          $parse_result = date_ical_parse_exceptions($field, $data);
+          break;
+
+        case 'DURATION':
+          // Can't be sure whether DTSTART is before or after DURATION in
+          // the VEVENT, so store the data and parse it at the end.
+          $subgroup['DURATION'] = array('DATA' => $data);
+          break;
+
+        case 'RRULE':
+        case 'EXRULE':
+          $parse_result = date_ical_parse_rrule($field, $data);
+          break;
+
+        case 'SUMMARY':
+        case 'DESCRIPTION':
+        case 'LOCATION':
+          $parse_result = date_ical_parse_text($field, $data);
+          break;
+
+          // For all other properties, just store the property and the value.
+          // This can be expanded on in the future if other properties should
+          // be given special treatment.
+        default:
+          $parse_result = $data;
+          break;
+      }
+
+      // Store the result of our parsing
+      $subgroup[$name] = $parse_result;
+    }
+  }
+  return $items;
+}

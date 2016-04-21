@@ -1,0 +1,24 @@
+Index: mollom.module
+===================================================================
+RCS file: /cvs/drupal-contrib/contributions/modules/mollom/mollom.module,v
+retrieving revision 1.1.2.15
+diff -u -p -r1.1.2.15 mollom.module
+--- mollom.module       8 May 2008 21:44:36 -0000       1.1.2.15
++++ mollom.module       17 May 2008 02:22:45 -0000
+@@ -584,6 +584,16 @@ function mollom_protectable_forms() {
+           'name' => strtolower($name) ." form",
+           'mode' => MOLLOM_MODE_ANALYSIS);
+     }
++
++    // Add all the webforms
++    if (module_exists('webform')) {
++      $webformids = db_query("SELECT title, nid FROM {node} WHERE type = '%s' and status = %d", 'webform', 1);
++      while ($webformid = db_fetch_object($webformids)) {
++        $forms['webform_client_form_'. $webformid->nid] = array(
++          'name' => check_plain('Webform: '. $webformid->title),
++          'mode' => MOLLOM_MODE_CAPTCHA);
++      }
++    }
+   }
+
+   return $forms;

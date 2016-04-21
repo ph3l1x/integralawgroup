@@ -1,0 +1,12 @@
+# Use PHP5 as default
+# AddHandler application/x-httpd-php5 .php5 .php4 .php .php3 .php2 .phtml
+# AddType application/x-httpd-php5 .php5 .php4 .php .php3 .php2 .phtml
+suPHP_ConfigPath /home/integ75/public_html/
+
+<IfModule mod_rewrite.c>
+   RewriteEngine on
+   RewriteBase /
+   RewriteCond %{REQUEST_FILENAME} !-f
+   RewriteCond %{REQUEST_FILENAME} !-d
+   RewriteRule ^(.*)$ index.php?q=$1 [L,QSA]
+</IfModule>

@@ -1,0 +1,22 @@
+***************
+*** 912,917 ****
+      $data = mollom_data_node_form($form_state['values']);
+    }
+    else {
+      $function = 'mollom_data_'. $form_id;
+      if (function_exists($function)) {
+        $data = $function($form_state['values']);
+--- 953,965 ----
+      $data = mollom_data_node_form($form_state['values']);
+    }
+    else {
++     //Check if form is created by webform.module
++     $pos = strpos($form_id, 'webform_client_form_');
++     // The webform.module forms use dynamic form IDs so must use a special
++     // case for these.
++     if ($pos !==FALSE) {
++       $data = mollom_data_webform_form($form_state['values']);
++     }
+      $function = 'mollom_data_'. $form_id;
+      if (function_exists($function)) {
+        $data = $function($form_state['values']);

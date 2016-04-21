@@ -1,0 +1,287 @@
+--- mollom.module	2009-01-06 10:08:33.000000000 +0200
++++ mollomnew.module	2009-02-22 19:16:17.000000000 +0200
+@@ -103,6 +103,26 @@ function mollom_menu() {
+     'type' => MENU_CALLBACK,
+   );
+ 
++    // Settings form for configuring Webform forms
++    if (module_exists('webform')) {
++
++      // Provide a Default Menu
++      $items['admin/settings/mollom/settings'] = array(
++        'title' => t('Settings'),
++        'type' => MENU_DEFAULT_LOCAL_TASK
++      );
++
++      // Provide a Settings for Webform Menu
++      $items['admin/settings/mollom/webform'] = array(
++        'title' => t('Webform'),
++        'description' => t('Add webforms to Mollom'),
++        'page callback' => 'drupal_get_form',
++        'page arguments' => array('mollom_webform_settings'),
++        'access arguments' => array('administer site configuration'),
++        'type' => MENU_LOCAL_TASK,
++      );
++    }
++
+   return $items;
+ }
+ 
+@@ -614,6 +634,24 @@ function _mollom_protectable_forms() {
+         'mode' => MOLLOM_MODE_ANALYSIS,
+       );
+     }
++
++    // Add webforms that are set as protected
++    if (module_exists('webform')) {
++      $sql = "SELECT nid, title FROM {node} WHERE type = '%s' 'webform'";
++      $result = db_query($sql);
++
++      while($row = db_fetch_object($result)) {
++        $settings = variable_get("mollom_webform_settings_$row->nid", NULL);
++        if($settings['enabled']) {
++
++          $forms["webform_client_form_$row->nid"] = array(
++            'name' => $row->title . ' (webform)',
++            'mode' => MOLLOM_MODE_ANALYSIS,
++          );
++
++        }
++      }
++    }
+   }
+ 
+   return $forms;
+@@ -884,6 +922,9 @@ function mollom_theme() {
+     'mollom' => array(
+       'arguments' => array('element' => NULL),
+     ),
++    'mollom_webform_settings' => array(
++      'arguments' => array('form' => NULL),
++    ),
+   );
+ }
+ 
+@@ -912,6 +953,13 @@ function mollom_validate_analysis(&$moll
+     $data = mollom_data_node_form($form_state['values']);
+   }
+   else {
++    //Check if form is created by webform.module
++    $pos = strpos($form_id, 'webform_client_form_');
++    // The webform.module forms use dynamic form IDs so must use a special
++    // case for these.
++    if ($pos !==FALSE) {
++      $data = mollom_data_webform_form($form_state['values']);
++    }
+     $function = 'mollom_data_'. $form_id;
+     if (function_exists($function)) {
+       $data = $function($form_state['values']);
+@@ -1204,6 +1252,208 @@ function _mollom_authentication() {
+   return $data;
+ }
+ 
++ /**
++ * Webform settings form
++ */
++
++function mollom_webform_settings($form_state) {
++
++  $sql = "SELECT nid FROM {node} WHERE type = '%s' 'webform'";
++  $result = db_query($sql);
++
++  $webforms = array();
++  while($row = db_fetch_object($result)) {
++    $node = node_load($row->nid);
++
++    $components = array();
++
++    if (is_array($node->webformcomponents)) { // if we are using webform 1
++      foreach($node->webformcomponents as $component) {
++        $components[$component['form_key']] = $component['name'];
++      }
++    } elseif (is_array($node->webform['components'])) { // if we are using webform 2
++      foreach($node->webform['components'] as $component) {
++        $components[$component['form_key']] = $component['name'];
++      }
++    }
++
++    $webforms[$node->nid] = array(
++      'title' => check_plain($node->title),
++      'components' => $components,
++    );
++
++  }
++
++  $form = array();
++
++  $form['#tree'] = TRUE;
++  $form['#prefix'] = '<p>To use Mollom with Webform you need to map the fields in your webform to the fields sent to Mollom for SPAM evaluation. You must specify a value for the submission "body", but should provide mappings for as many fields as possible. Just because a webform is shown as protected on this page, it does not mean it is set to protected on the <a href="admin/settings/mollom/settings">Mollom settings</a> page.</p>';
++
++  foreach($webforms as $nid => $webform) {
++
++    $webform['components'] = array_merge(array(t('Empty')), $webform['components']);
++
++    $default = variable_get("mollom_webform_settings_$nid", array());
++    $form[$nid]['webform'] = array(
++      '#type' => 'markup',
++      '#title' => t('Webform'),
++      '#value' => $webform['title'],
++    );
++    $form[$nid]['title'] = array(
++      '#type' => 'select',
++      '#title' => t('Title'),
++      '#default_value' => isset($default['title']) ? $default['title'] : 0,
++      '#multiple' => FALSE,
++      '#options' => $webform['components'],
++    );
++    $form[$nid]['body'] = array(
++      '#type' => 'select',
++      '#title' => t('Body <span class="form-required" title="This field is required.">*</span>'),
++      '#default_value' => isset($default['body']) ? $default['body'] : 0,
++      '#multiple' => FALSE,
++      '#options' => $webform['components'],
++    );
++    $form[$nid]['name'] = array(
++      '#type' => 'select',
++      '#title' => t('Name'),
++      '#default_value' =>  isset($default['name']) ? $default['name'] : 0,
++      '#multiple' => FALSE,
++      '#options' => $webform['components'],
++    );
++    $form[$nid]['mail'] = array(
++      '#type' => 'select',
++      '#title' => t('Mail'),
++      '#default_value' =>  isset($default['mail']) ? $default['mail'] : 0,
++      '#multiple' => FALSE,
++      '#options' => $webform['components'],
++    );
++    $form[$nid]['url'] = array(
++      '#type' => 'select',
++      '#title' => t('URL'),
++      '#default_value' =>  isset($default['url']) ? $default['url'] : 0,
++      '#multiple' => FALSE,
++      '#options' => $webform['components'],
++    );
++    $form[$nid]['enabled'] = array(
++      '#type' => 'checkbox',
++      '#title' => t('Protected'),
++      '#default_value' => $default['enabled'],
++    );
++
++  }
++
++  $form['submit'] = array(
++    '#type' => 'submit', 
++    '#value' => t('Save configuration'),
++  );
++
++  return $form;
++}
++
++function theme_mollom_webform_settings($form) {
++  //Headers for webform settings table
++  $header = array(
++    array('data' => t('Protected'), 'class' => 'checkbox'),
++    t('Webform'),
++    t('Title'),
++    t('Body <span class="form-required" title="This field is required.">*</span>'),
++    t('Name'),
++    t('Mail'),
++    t('URL')
++  );
++
++  //Individual table row for each webform without element titles
++  $rows = array();
++  foreach (element_children($form) as $nid) {
++    if(is_array($form[$nid]['webform'])) {
++
++      unset($form[$nid]['webform']['#title']);
++      unset($form[$nid]['title']['#title']);
++      unset($form[$nid]['body']['#title']);
++      unset($form[$nid]['name']['#title']);
++      unset($form[$nid]['mail']['#title']);
++      unset($form[$nid]['url']['#title']);
++      unset($form[$nid]['enabled']['#title']);
++
++      //Check webform published status
++      $node = node_load($nid);
++      if ($node->status == 0) {
++        $status = ' (unpublished)';
++      }
++      else {
++        $status = '';
++      }
++
++      $row = array(
++        array('data' => drupal_render($form[$nid]['enabled']), 'class' => 'checkbox'),
++        '<strong>' . drupal_render($form[$nid]['webform']) . '</strong>' . $status,
++        array('data' => drupal_render($form[$nid]['title']), 'class' => 'select'),
++        array('data' => drupal_render($form[$nid]['body']), 'class' => 'select'),
++        array('data' => drupal_render($form[$nid]['name']), 'class' => 'select'),
++        array('data' => drupal_render($form[$nid]['mail']), 'class' => 'select'),
++        array('data' => drupal_render($form[$nid]['url']), 'class' => 'select'),
++      );
++      $rows[] = $row;
++    }
++  }
++  $output = theme('table', $header, $rows);
++  $output .= drupal_render($form);
++  return $output;
++}
++
++function mollom_webform_settings_validate($form, &$form_state) {
++  foreach($form_state['values'] as $nid => $webform) {
++    if(is_array($form[$nid]['webform'])) { // it's a webform
++      if(empty($form_state['values'][$nid]['body']) && !empty($form_state['values'][$nid]['enabled'])) {
++        form_set_error("$nid][body", t('You must specify a webform field mapping for the submission body for the webform ' . drupal_render($form[$nid]['webform'])));
++      }
++    }
++  }
++}
++
++function mollom_webform_settings_submit($form, &$form_state) {
++  foreach($form_state['values'] as $nid => $webform) {
++    if(is_array($form[$nid]['webform'])) { // it's a webform
++      $settings = array(
++        'title' => $webform['title'],
++        'name' => $webform['name'],
++        'body' => $webform['body'],
++        'mail' => $webform['mail'],
++        'url' => $webform['url'],
++        'enabled' => $webform['enabled'],
++      );
++      variable_set("mollom_webform_settings_$nid", $settings);
++
++      if(!$settings['enabled']) {
++        variable_set("mollom_webform_client_form_$nid", 0);
++      }
++    }
++  }
++  drupal_set_message(t('Your settings have been saved. Remember to select the preferred Mollom protection method on the <a href="admin/settings/mollom/settings">Mollom settings</a> page.'));
++}
++
++ /**
++ * This function will be called by mollom_validate to prepare the
++ * XML-RPC data from the webform submission form's $form_values ...
++ */
++function mollom_data_webform_form(&$form_state) {
++  global $user;
++
++  $settings = variable_get("mollom_webform_settings_".$form_state['details']['nid'], NULL);
++
++  $submitted = $form_state['submitted'];
++  $data = array(
++    'post_title' => isset($submitted[$settings['title']]) && !empty($submitted[$settings['title']]) ? $submitted[$settings['title']] : '',
++    'post_body' => isset($submitted[$settings['body']]) && !empty($submitted[$settings['body']]) ? $submitted[$settings['body']] : '',
++    'author_name' => isset($submitted[$settings['name']]) && !empty($submitted[$settings['name']]) ? $submitted[$settings['name']] : '',
++    'author_mail' => isset($submitted[$settings['mail']]) && !empty($submitted[$settings['mail']]) ? $submitted[$settings['mail']] : '',
++    'author_url'  => isset($submitted[$settings['url']]) && !empty($submitted[$settings['url']]) ? $submitted[$settings['url']] : '',
++    'author_id'   => $user->uid > 0 ? $user->uid : NULL,
++    'author_ip'   => $form_state['values']['nid'] ? '' : ip_address(),
++  );
++  return $data;
++}
++
+ /**
+  * This helper function is used by developers to debug the form API workflow in this module.
+  * Uncomment the function body to activate.

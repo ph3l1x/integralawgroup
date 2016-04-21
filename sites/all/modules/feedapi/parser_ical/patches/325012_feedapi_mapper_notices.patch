@@ -1,0 +1,127 @@
+Index: feedapi_mapper.module
+===================================================================
+--- feedapi_mapper.module	(revision 6260)
++++ feedapi_mapper.module	(working copy)
+@@ -46,11 +46,11 @@
+  */
+ function feedapi_mapper_nodeapi(&$node, $op, $teaser, $page) {
+   switch ($op) {
+-  case 'prepare':
+-    if ($node->feedapi->feed_item) {
+-      _feedapi_mapper_map($node);
+-    }
+-    break;
++    case 'prepare':
++      if (isset($node->feedapi) && $node->feedapi->feed_item) {
++        _feedapi_mapper_map($node);
++      }
++      break;
+   }
+ }
+ 
+@@ -75,7 +75,7 @@
+         $element_path = unserialize($element_path);
+         // Get the feed item element on $element_path and pass it into the mapping function.
+         $feed_item_element = _feedapi_mapper_get_feed_item_element($element_path, $feed_item);
+-        $node = call_user_func($field[0] .'_feedapi_mapper', 'map', $node, $field[1], $feed_item_element, $field[2]);
++        $node = call_user_func($field[0] .'_feedapi_mapper', 'map', $node, $field[1], $feed_item_element, isset($field[2]) ? $field[2] : NULL);
+       }
+     }
+   }
+@@ -89,7 +89,7 @@
+   if (count($path) > 0) {
+     return _feedapi_mapper_get_feed_item_element($path, $item[$p]);
+   }
+-  else {
++  else if (isset($item[$p])) {
+     return $item[$p];
+   }
+ }
+@@ -109,7 +109,7 @@
+   }
+   $names = node_get_types('names');
+   drupal_set_title($node->title ? $node->title : $names[$node->type]);
+-  $output .= t('Map feed item elements to feed item node fields.');
++  $output = t('Map feed item elements to feed item node fields.');
+   $output .= drupal_get_form('feedapi_mapper_form', $node);
+   return $output;
+ }
+@@ -189,7 +189,7 @@
+       '#type' => 'select',
+       '#title' => $element_name,
+       '#options' => $field_mappers,
+-      '#default_value' => $mapping[$path],
++      '#default_value' => isset($mapping[$path]) ? $mapping[$path] : '',
+     );
+   }
+   $form['submit'] = array(
+@@ -313,6 +313,7 @@
+     // Convert items to array.
+     $items = _feedapi_mapper_obj2array($feed->items);
+     // Merge items to one item.
++    $merged = NULL;
+     if (is_array($items)) {
+       $i = 0;
+       foreach ($items as $item) {
+@@ -440,7 +441,7 @@
+ function _feedapi_mapper_array_merge_recursive($array1, $array2) {
+   foreach ($array1 as $k => $v) {
+     if (is_array($array1[$k])) {
+-      $result[$k] = _feedapi_mapper_array_merge_recursive($array1[$k], $array2[$k]);
++      $result[$k] = _feedapi_mapper_array_merge_recursive($array1[$k], isset($array2[$k]) ? $array2[$k] : NULL);
+     }
+     else {
+       $result[$k] = $array1[$k];
+@@ -449,7 +450,7 @@
+   if (is_array($array2)) {
+     foreach ($array2 as $k => $v) {
+       if (is_array($array2[$k])) {
+-        $result[$k] = _feedapi_mapper_array_merge_recursive($array2[$k], $array1[$k]);
++        $result[$k] = _feedapi_mapper_array_merge_recursive($array2[$k], isset($array1[$k]) ? $array1[$k] : NULL);
+       }
+       else {
+         $result[$k] = $array2[$k];
+@@ -525,6 +526,8 @@
+   $form_id = $node_type .'_node_form';
+   $node = new stdClass();
+   $node->type = $node_type;
++  $node->name = NULL; // prevent PHP notice from node_form()
++
+   // Borrow this from CCK:
+   // Some modules (userreview...) "hide" their node forms, resulting in no field
+   // being listed. We set a special flag to inform them this form is special.
+@@ -577,7 +580,7 @@
+  *   HTML output.
+  */
+ function theme_feedapi_mapper_descriptions($descriptions) {
+-  $output .= '<dl>';
++  $output = '<dl>';
+   foreach ($descriptions as $field_mapper => $implementations) {
+     foreach ($implementations as $module => $description) {
+       $output .= '<dt><strong>'. $field_mapper .' '. t('(!module_name module)', array('!module_name' => $module)) .'</strong></dt>';
+Index: mappers/feedapi_mapper_content.inc
+===================================================================
+--- mappers/feedapi_mapper_content.inc	(revision 6260)
++++ mappers/feedapi_mapper_content.inc	(working copy)
+@@ -34,7 +34,7 @@
+       // We just need to put the two things together. The data structure here depends a lot on
+       // CCK. We stick the value in $feed_element into $node->$field_name[0]['value'].
+       if (!is_array($feed_element)) {
+-        $field = $node->$field_name;
++        $field = isset($node->$field_name) ? $node->$field_name : array();
+         $field[0]['value'] = $feed_element;
+         $node->$field_name = $field;
+       }
+Index: mappers/feedapi_mapper_taxonomy.inc
+===================================================================
+--- mappers/feedapi_mapper_taxonomy.inc	(revision 6260)
++++ mappers/feedapi_mapper_taxonomy.inc	(working copy)
+@@ -50,7 +50,7 @@
+         $feed_element = array($feed_element);
+       }
+       if (is_array($feed_element)) {
+-        if (!is_array($node->taxonomy)) {
++        if (!isset($node->taxonomy) || !is_array($node->taxonomy)) {
+           $node->taxonomy = array();
+         }
+         $node->taxonomy = array_merge($node->taxonomy, _feedapi_mapper_create_terms($feed_element, $sub_field));

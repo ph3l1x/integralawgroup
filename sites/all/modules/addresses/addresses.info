@@ -1,0 +1,12 @@
+; $Id: addresses.info,v 1.5 2008/08/05 13:23:43 brmassa Exp $
+core            = "6.x"
+dependencies[]  = token
+description     = "You can associate a geographic location with content and users."
+name            = "Addresses"
+
+; Information added by drupal.org packaging script on 2008-10-23
+version = "6.x-1.0-alpha3"
+core = "6.x"
+project = "addresses"
+datestamp = "1224729302"
+

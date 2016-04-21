@@ -1,0 +1,142 @@
+<?php
+/* $Id$ */
+
+/**
+ * @file
+ * Parse the incoming URL with date_api_ical 
+ */
+
+/**
+ * Implementation of hook_help().
+ */
+function parser_ical_help($path, $arg) {
+  switch($path) {
+    case 'admin/modules#description':
+      return t('Provide a common ical parser for FeedAPI-compatible modules.');
+    case 'feedapi/full_name':
+      return t('Parser Common iCal Syndication');
+  }
+}
+
+/**
+ * Implementation of hook_feedapi_feed().
+ */
+function parser_ical_feedapi_feed($op) {
+  $args = func_get_args();
+  switch ($op) {
+    case 'type':
+      return array('iCal feed');
+
+    case 'compatible':
+      $url = is_object($args[1]) ? $args[1] : FALSE;      
+      $ical_array = _parser_ical_feedapi_parse($url, FALSE);
+      if ($ical_array !== FALSE) {
+        return 'iCal feed';
+      }
+      else {
+        return FALSE;
+      }
+    
+    case 'parse':
+      $feed = is_object($args[1]) ? $args[1] : FALSE;
+      $cache = isset($args[2]) ? $args[2] : FALSE;
+      return _parser_ical_feedapi_parse($feed, $cache);
+  }
+}
+
+/**
+ * Parse the feed into a data structure
+ *
+ * @param $url
+ *  The feed's url
+ * @param $cache
+ *  If the results can be cached or not
+ * @return stdClass
+ *  The structured datas extracted from the feed
+ */
+function _parser_ical_feedapi_parse($feed, $cache = FALSE) {
+  $downloaded_string = _parser_ical_download($feed->url);
+  
+  // What is FEEDAPI_FEED_NOT_UPDATED supposed to be? It is not defined.
+  //if ($downloaded_string === FALSE || $downloaded_string === FEEDAPI_FEED_NOT_UPDATED) {
+  if ($downloaded_string === FALSE || empty($downloaded_string)) {
+    return $downloaded_string;
+  }
+  
+  return _parser_ical_parse($downloaded_string);
+}
+
+/**
+ * Parse iCal feeds.
+ *
+ * Uses patched ical_upload.
+ */
+function _parser_ical_parse($feed_content) {
+  include_once(drupal_get_path('module', 'date_api') .'/date_api_ical.inc');
+  $feed_folded = explode("\n", $feed_content);
+  $ical_parsed = date_ical_parse($feed_folded);
+  $ical = $ical_parsed[0];
+  
+  // Any or all of these items could be missing, so always use isset() to test.
+  $parsed_source = new stdClass();
+  // Detect the title
+  $parsed_source->title = isset($ical['X-WR-CALNAME']) ? $ical['X-WR-CALNAME'] : ''; 
+  // Detect the description
+  $parsed_source->description = isset($ical['X-WR-CALDESC']) ? $ical['X-WR-CALDESC'] : '';
+  $parsed_source->options = new stdClass();
+  $parsed_source->options->calscale = isset($ical['CALSCALE']) ? $ical['CALSCALE'] : '';
+  $parsed_source->options->timezone = isset($ical['X-WR-TIMEZONE']) ? $ical['X-WR-TIMEZONE'] : '';
+  $parsed_source->items = array();
+  
+  foreach ($ical['VEVENT'] as $event)	{
+    $item = new stdClass();
+    $item->title = $event['SUMMARY'];
+    $item->description = isset($event['DESCRIPTION']) ? $event['DESCRIPTION'] : '';
+    
+    $item->options = new stdClass();
+    $item->options->original_author = '';
+    $item->options->location = isset($event['URL']) ? $event['URL'] : '';
+    $item->options->original_url = $item->options->location;
+    
+    if (isset($event['DTSTAMP'])){
+      $item->options->timestamp = date_format(date_ical_date($event['DTSTAMP']), 'U');
+    }
+    $item->options->guid = isset($event['UID']) ? $event['UID'] : ''; // intention
+    $item->options->tags = isset($event['CATEGORIES']) ? implode(',', $event['CATEGORIES']) : array();
+
+    // Keep ical date arrays intact so we have both date and timezone 
+    // info together so we can create the right date values in the nodes.
+    $dates = array('CREATED', 'LAST-MODIFIED', 'DTSTART', 'DTEND', 'DTSTAMP', 'RDATE', 'TRIGGER', 'FREEBUSY', 'DUE', 'COMPLETED', 'EXDATE');
+    foreach ($dates as $key) {
+      if (isset($event[$key])) {
+        $item->options->$key = serialize($event[$key]);
+        unset($event[$key]);
+      }
+    }
+
+    $item->raw = $event;
+    $parsed_source->items[] = $item;
+  }
+  return $parsed_source;
+}
+
+/******************************************************************************************************************
+ * PATCHED FUNCTIONS
+ */
+/********************************************
+ * _parser_common_syndication_download
+ *
+ * Just changed to allow passing of $allowed_mine array()
+ */
+function _parser_ical_download($url) {
+  $method = 'GET';
+  $follow = 3;
+  $data = NULL;
+  $headers = array();
+  if (!empty($username)) {
+    $headers['Authorization'] = 'Basic '. base64_encode("$username:$password");
+  }
+  $result = drupal_http_request($url, $headers, $method, $data, $follow);
+  return $result->data;
+}
+
