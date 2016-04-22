@@ -16,6 +16,8 @@
 
 						"/healthcare-capital",
 	  					"/estate_planning",
+	  "/debit_negotiation_settlement",
+	  "/our_fees",
 					   "/attorney-bankruptcy-debt-relief");
 
 	
@@ -64,7 +66,12 @@
 
 <? /* Ryan add */ ?>
 
-
+						<?php if(strpos($requestUri, 'our_fees')) { ?>
+						  <img src="<?php print $themePath; ?>/images/rock_climbing.jpg" width="696" height="490" />
+					  <?php } ?>
+					  <?php if(strpos($requestUri, 'debit_negotiation_settlement')) { ?>
+					  		<img src="<?php print $themePath; ?>/images/watch_money.jpg" width="696" height="490" />
+					  <?php } ?>
 						<?php if(strpos($requestUri, 'healthcare-capital')) { ?>
 
 							<img src="<?php echo $themePath; ?>/images/page_healthcare_capital.jpg" width="696" height="490" />

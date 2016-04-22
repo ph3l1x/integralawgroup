@@ -1,6 +1,6 @@
 <div id="footer">
 
-	&copy; 2012 Integra Law Group. All Rights Reserved.<br />
+	&copy; 2016 Integra Law Group. All Rights Reserved.<br />
 
 	<a href="/legal-notice">Legal Notice</a>
 

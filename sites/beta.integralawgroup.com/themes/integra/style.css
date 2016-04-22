@@ -572,8 +572,29 @@ div#footer a {
 
 #links {
 
-    margin: 42px 0px 0px 10px;
+    margin: 15px 0px 0px 10px;
 
+}
+
+.bruceText {
+    color: white;
+    font-size: 14px;
+    font-family: Arial;
+}
+
+.bruceLearnMore {
+    float: right;
+    margin: 10px;
+}
+
+.bruceLearnMore a {
+    color: white;
+    text-decoration: none;
+}
+
+.bruceLearnMore a:hover {
+    color: white;
+    text-decoration: underline;
 }
 
 #links img.link {
@@ -606,11 +627,12 @@ div#links img.link {
 
 div#links h3 {
 
-    cursor: pointer;
+    /*cursor: pointer;*/
 
     margin: 0px;
 
     padding: 0px;
+    clear: both;
 
 }
 
@@ -843,4 +865,39 @@ div#more a {
     color: #A0DBF3;
     text-align: center;
     padding-top: 45px;
+}
+
+.feesContainer {
+    color: white;
+    font-family: Arial;
+    font-size: 14px;
+}
+
+.feeItem:nth-of-type(odd) {
+    background: rgba(160, 219, 243, .1);
+}
+
+.feeItem {
+    clear: both;
+    float:left;
+    padding: 15px 10px;
+}
+
+.feesDesc {
+    float: left;
+    width: 420px;
+    padding-right: 25px;
+}
+
+.feesPrice {
+    float: left;
+    width: 194px
+}
+.feeExtraInfo {
+    clear:both;
+    margin-top:10px;
+    padding:0 10px;
+    font-size:13px;
+    font-style: italic;
+    float:left;
 }

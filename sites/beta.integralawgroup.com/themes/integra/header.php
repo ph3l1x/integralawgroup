@@ -74,8 +74,8 @@
                 <li id="tab_green"><a href="/business-planning-exit-strategies">Acquiring a Business <br />& Asset Protection</a></li>
                 <li id="tab_orange"><a href="/selling_a_business">Exit Strategies &<br />Selling Your Business</a></li>
                 <li id="tab_blue"><a href="/estate_planning">Estate Planning</a></li>
-                <li id="tab_red"><a href="http://www.boise-bankruptcy-attorney.com/" target="_blank">Bankruptcy Protection<br /> &amp; Debt Relief</a></li>
-                <li id="tab_yellow"><a href="/family-law">Family Law</a></li>
+                <li id="tab_red"><a href="/debit_negotiation_settlement">Debt Negotiation<br /> &amp; Settlement</a></li>
+                <li id="tab_yellow"><a href="/our_fees">Our Fees</a></li>
 
 
 <!-- Old 1.14.10

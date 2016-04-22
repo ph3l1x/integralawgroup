@@ -141,7 +141,7 @@
 
 		</div>
         
-        	<?php } else if( strpos($requestUri, "family-law") ) { ?>
+        	<?php } else if( strpos($requestUri, "our_fees") ) { ?>
 
 		<h2>LEARN MORE</h2>
 
@@ -190,7 +190,22 @@
 
 <div id="links">
 
-	<!-- Begin Video Library -->
+
+  <!-- Home Page Only -->
+<?php if($_SERVER['REQUEST_URI'] == '/' || strpos($requestUri, "about")) { ?>
+  <div class="bruceInfo">
+	<img src="<?php print $themePath; ?>/images/Bruce_Perry.jpg">
+	<div class="bruceText">
+	  Integra Law Group is a new kind of law firm. We use technology and a virtual office environment to provide affordable legal services.
+	  <div class="bruceLearnMore"><a href="/about-integra-law-group">» Learn More</a></div>
+	</div>
+  </div>
+
+<?php } else { ?>
+
+
+
+  <!-- Begin Video Library -->
 
 	<ul id="accordion1" class="accordion">
 
@@ -226,7 +241,7 @@
 
 	<a href="http://www.integralawblog.com/" target="_blank"><img src="<?php echo $themePath; ?>/images/link_blog.gif" width="200" height="36" /></a>
 
-<?php } ?> 
+<?php } ?>
 
 <?php if(false) { ?>
 
@@ -248,7 +263,7 @@
 
 	</ul>
 
-<?php } ?> 
+<?php } ?>
 
 <?php //if(false) { ?>
 
@@ -266,7 +281,7 @@
 
 	</ul>
 
-<?php //} ?> 
+
 
 </div>
 
@@ -276,13 +291,13 @@
 
 	var accordion1 = new TINY.accordion.slider("accordion1");
 
-	accordion1.init("accordion1","h3");			
+	accordion1.init("accordion1","h3");
 
 
 
 	var accordion2 = new TINY.accordion.slider("accordion2");
 
-	accordion2.init("accordion2","h3");			
+	accordion2.init("accordion2","h3");
 
 </script>
 
@@ -290,7 +305,7 @@
 
 <?php require_once('contact_us_form.php'); ?>
 
-
+<?php } // end of if else statement for showing bruce's picture on about and home page. ?>
 
 <!-- Bruce Perry Quote
 
